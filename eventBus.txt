@@ -1,0 +1,76 @@
+class EventBus {
+    constructor() {
+        this.eventMap = new Map() // 收集所有订阅事件 eventMap: Map(3) {'event1' => Array(3), 'event2' => Array(1), 'once1' => Array(0)}
+    }
+    on (type, fn) { // 订阅事件
+        if (!type) return '事件名称不能为空'
+        const targetEvent = this.eventMap.get(type)
+        if (!targetEvent) {
+            this.eventMap.set(type, [fn]) // 某个事件可能存在多个订阅者，故用数组存储该事件的所有订阅者（事件回调）
+        } else {
+            targetEvent.push(fn)
+        }
+    }
+    emit (type, ...args) { // 发布事件，所有订阅该事件的都会收到消息（让 args 变成一个数组，可接收多个参数）
+        const targetEvent = this.eventMap.get(type)
+        if (!targetEvent) return `没有${type || ''}该事件`
+        targetEvent.forEach(fn => {
+            fn.apply(null, [type, ...args])
+        })
+    }
+    off (type, fn) { // 删除这个订阅事件下的某个订阅者(fn)
+        const targetEvent = this.eventMap.get(type)
+        if (!targetEvent) return `没有${type || ''}该事件`
+        const targetFnIndex = targetEvent.findIndex(_fn => _fn === fn)
+        targetEvent.splice(targetFnIndex, 1)
+    }
+    once (type, fn) { // 订阅一次后，自动取消订阅，后面再发布该事件，则收不到消息
+        const targetEvent = this.eventMap.get(type)
+        const _this = this
+        function handler () {
+            _this.off(type, fn)
+            fn.apply(null, arguments)
+        }
+        this.on(type, handler) // 这里订阅后，里面删除了该事件，然后执行了 fn
+    }
+}
+
+
+
+// 测试用例：
+let bus = new EventBus()
+
+function xiaoMing (...params) {
+   console.log('小明收到消息：', params)
+}
+function xiaoHong (...params) {
+   console.log('小红收到消息：', params)
+}
+function xiaoBai (...params) {
+   console.log('小白收到消息：', params)
+}
+// 首先这三个人都订阅了 'xiangling' 这个事件
+bus.on('xiangling', xiaoMing)
+bus.on('xiangling', xiaoHong)
+bus.on('xiangling', xiaoBai)
+// 这里只要发布 'xiangling' 这个事件，他们都会收到消息
+bus.emit('xiangling', '上课了')
+
+// 【控制台打印】
+// 小明收到消息： (2) ['xiangling', '上课了']
+// 小红收到消息： (2) ['xiangling', '上课了']
+// 小白收到消息： (2) ['xiangling', '上课了']
+
+// 小明取消订阅 'xiangling' 这个事件，那么再发布这个事件，小明就收不到消息
+console.log('xiaoMing 取消订阅 xiangling 事件')
+bus.off('xiangling', xiaoMing)
+bus.emit('xiangling', '下课了')
+
+// 【控制台打印】
+// 小红收到消息： (2) ['xiangling', '下课了']
+// 小白收到消息： (2) ['xiangling', '下课了']
+
+console.log('xiaoMing 只订阅一次 fangxue 事件')
+bus.once('fangxue', xiaoMing)
+bus.emit('fangxue', '放学了', { time: '17:00' }) // 这里才会有打印
+bus.emit('fangxue', '放学了', { time: '18:00' }) // 后面发布 'fangxue' 这个事件，小明都接收不到了
